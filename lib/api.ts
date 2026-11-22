@@ -1,0 +1,126 @@
+import axios, { AxiosError, AxiosInstance } from 'axios';
+
+export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3001/api';
+
+export class ApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Configured Axios client instance
+export const apiClient: AxiosInstance = axios.create({
+  baseURL: API,
+  headers: {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  },
+  timeout: 30000,
+});
+
+// Request interceptor: attach bearer token
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('tindahan_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+    delete config.headers['content-type'];
+  }
+  return config;
+});
+
+// Response interceptor: extract Laravel validation messages and normalize errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError<any>) => {
+    if (error.response) {
+      const data = error.response.data;
+      const status = error.response.status;
+      // Extract first Laravel validation message if available
+      const firstError = data?.errors
+        ? (Object.values(data.errors).flat()[0] as string)
+        : null;
+      const message = firstError ?? data?.message ?? error.message ?? 'Something went wrong.';
+      return Promise.reject(new ApiError(message, status));
+    }
+    return Promise.reject(new ApiError(error.message || 'Cannot reach the server.', 0));
+  }
+);
+
+// Backward-compatible api() function powered by Axios
+export async function api<T = any>(
+  path: string,
+  opts: { method?: string; body?: unknown; headers?: Record<string, string> } = {}
+): Promise<T> {
+  const method = (opts.method ?? 'GET').toUpperCase();
+  const headers: Record<string, any> = { ...(opts.headers || {}) };
+
+  if (typeof FormData !== 'undefined' && opts.body instanceof FormData) {
+    // Allow axios and browser to auto-assign multipart/form-data boundary
+    delete headers['Content-Type'];
+    delete headers['content-type'];
+  }
+
+  const res = await apiClient.request<T>({
+    url: path,
+    method,
+    data: opts.body,
+    headers,
+  });
+
+  return res.data;
+}
+
+export const peso = (n: number) =>
+  '₱' + Number(n).toLocaleString('en-PH', { maximumFractionDigits: 2 });
+
+export const errorText = (e: unknown) => {
+  if (e instanceof ApiError) return e.message;
+  if (axios.isAxiosError(e)) {
+    const data = e.response?.data as any;
+    const first = data?.errors ? (Object.values(data.errors).flat()[0] as string) : null;
+    return first ?? data?.message ?? e.message ?? 'Cannot reach the server.';
+  }
+  if (e instanceof Error) return e.message;
+  return 'Cannot reach the server.';
+};
+
+export type Product = {
+  id: number;
+  name: string;
+  sku: string;
+  barcode: string | null;
+  emoji: string | null;
+  image_path?: string | null;
+  image_url?: string | null;
+  price: number;
+  stock: number;
+  low_stock_threshold: number;
+};
+
+export function getProductImage(p: Partial<Product> | null | undefined): string | null {
+  if (!p) return null;
+  if (p.image_url) return p.image_url;
+  if (!p.image_path) return null;
+  if (p.image_path.startsWith('http://') || p.image_path.startsWith('https://') || p.image_path.startsWith('data:')) {
+    return p.image_path;
+  }
+  const clean = p.image_path.replace(/^\/?(storage\/)?/, '');
+  const baseUrl = API.replace(/\/api\/?$/, '');
+  return `${baseUrl}/storage/${clean}`;
+}
+
+export type Shift = {
+  id: number;
+  started_at: string;
+  ended_at: string | null;
+  total?: number | null;
+  sales_count?: number;
+  user?: { id: number; name: string };
+  items?: { product_name: string; qty: number; amount: number }[];
+};
