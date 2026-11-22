@@ -27,6 +27,7 @@ import {
   DollarSign,
   Briefcase,
   Boxes,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,9 +59,10 @@ export function OwnerWorkStation() {
 
   // Cash drop state
   const [showCashDrop, setShowCashDrop] = useState(false);
-  const [dropAmount, setDropAmount] = useState<number>(1000);
+  const [dropAmount, setDropAmount] = useState<number>(500);
   const [dropNote, setDropNote] = useState<string>('Safe transfer for day shift excess cash');
   const [cashDrops, setCashDrops] = useState<any[]>([]);
+  const [isDropping, setIsDropping] = useState(false);
 
   // Quick Restock state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -177,28 +179,44 @@ export function OwnerWorkStation() {
 
   // Execute Cash Drop
   const handleCashDrop = async () => {
-    if (dropAmount <= 0) return;
+    if (!currentShift) {
+      toast.error('Cannot perform cash drop: No cashier is currently on duty.');
+      return;
+    }
+    if (dropAmount <= 0) {
+      toast.error('Please enter a valid cash drop amount greater than ₱0.');
+      return;
+    }
+    if (dropAmount > totalDrawerCash) {
+      toast.error(`Cannot drop ${peso(dropAmount)}. Available drawer cash is ${peso(totalDrawerCash)}.`);
+      return;
+    }
+
+    setIsDropping(true);
     const cashierName = currentShift?.user?.name ?? user?.name ?? 'Store Cashier';
     try {
       await api('/cash-drops', {
         method: 'POST',
-        body: { amount: dropAmount, note: dropNote, cashier: cashierName },
+        body: { amount: dropAmount, note: dropNote.trim() || 'Safe transfer', cashier: cashierName },
       });
-    } catch {
-      // Local fallback
+
+      setCashDrops((prev) => [
+        {
+          id: Date.now(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          amount: dropAmount,
+          note: dropNote.trim() || 'Safe transfer',
+          cashier: cashierName,
+        },
+        ...prev,
+      ]);
+      setShowCashDrop(false);
+      toast.success(`Cash Drop of ${peso(dropAmount)} transferred to store safe.`);
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setIsDropping(false);
     }
-    setCashDrops((prev) => [
-      {
-        id: Date.now(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        amount: dropAmount,
-        note: dropNote,
-        cashier: cashierName,
-      },
-      ...prev,
-    ]);
-    setShowCashDrop(false);
-    toast.success(`Cash Drop of ${peso(dropAmount)} transferred to store safe.`);
   };
 
   // Record Store Expense
@@ -350,8 +368,13 @@ export function OwnerWorkStation() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
-              onClick={() => setShowCashDrop(true)}
-              className="h-9 px-3 gap-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer"
+              onClick={() => {
+                const initialDrop = totalDrawerCash > 500 ? totalDrawerCash - 500 : Math.max(0, totalDrawerCash);
+                setDropAmount(initialDrop);
+                setShowCashDrop(true);
+              }}
+              disabled={!currentShift || totalDrawerCash <= 0}
+              className="h-9 px-3 gap-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer disabled:opacity-50"
             >
               <PiggyBank className="size-4" />
               <span>Perform Cash Drop</span>
@@ -669,6 +692,22 @@ export function OwnerWorkStation() {
               </div>
             </div>
 
+            {/* Warning if drawer is empty */}
+            {totalDrawerCash <= 0 && (
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs">
+                <AlertTriangle className="size-4 shrink-0" />
+                <span>No cash available in drawer to transfer. Wait for POS sales before dropping cash.</span>
+              </div>
+            )}
+
+            {/* Warning if drop exceeds available drawer cash */}
+            {dropAmount > totalDrawerCash && totalDrawerCash > 0 && (
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs animate-in fade-in-50 duration-150">
+                <AlertTriangle className="size-4 shrink-0" />
+                <span>Cannot drop {peso(dropAmount)}. Drawer only contains {peso(totalDrawerCash)}.</span>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="drop-amount" className="font-bold uppercase tracking-wider text-[11px]">
                 Drop Amount to Transfer to Safe (₱)
@@ -676,21 +715,51 @@ export function OwnerWorkStation() {
               <Input
                 id="drop-amount"
                 type="number"
-                value={dropAmount}
-                onChange={(e) => setDropAmount(Number(e.target.value))}
-                className="text-base font-bold tabular-nums"
+                min="1"
+                max={totalDrawerCash}
+                step="any"
+                disabled={totalDrawerCash <= 0}
+                value={dropAmount || ''}
+                onChange={(e) => setDropAmount(Math.max(0, Number(e.target.value)))}
+                className={`text-base font-bold tabular-nums ${
+                  dropAmount > totalDrawerCash && totalDrawerCash > 0
+                    ? 'border-destructive focus-visible:ring-destructive text-destructive'
+                    : ''
+                }`}
               />
-              <div className="flex gap-2 pt-1">
-                {[500, 1000, 1500, 2000].map((amt) => (
+
+              {/* Quick smart presets */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {totalDrawerCash > 500 && (
                   <button
-                    key={amt}
                     type="button"
-                    onClick={() => setDropAmount(amt)}
-                    className="text-xs px-2.5 py-1 rounded-lg border bg-muted/60 hover:bg-muted font-medium cursor-pointer"
+                    onClick={() => setDropAmount(totalDrawerCash - 500)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg border bg-background hover:bg-muted font-medium cursor-pointer text-amber-600 dark:text-amber-400"
                   >
-                    ₱{amt}
+                    Keep ₱500 Float ({peso(totalDrawerCash - 500)})
                   </button>
-                ))}
+                )}
+                {totalDrawerCash > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDropAmount(totalDrawerCash)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg border bg-background hover:bg-muted font-medium cursor-pointer"
+                  >
+                    Drop All ({peso(totalDrawerCash)})
+                  </button>
+                )}
+                {[500, 1000, 1500, 2000]
+                  .filter((amt) => amt <= totalDrawerCash)
+                  .map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setDropAmount(amt)}
+                      className="text-xs px-2.5 py-1 rounded-lg border bg-muted/60 hover:bg-muted font-medium cursor-pointer"
+                    >
+                      ₱{amt}
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -711,8 +780,26 @@ export function OwnerWorkStation() {
             <Button variant="outline" onClick={() => setShowCashDrop(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCashDrop} className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
-              Confirm Safe Drop
+            <Button
+              onClick={handleCashDrop}
+              disabled={
+                dropAmount <= 0 ||
+                dropAmount > totalDrawerCash ||
+                totalDrawerCash <= 0 ||
+                !currentShift ||
+                isDropping
+              }
+              className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
+            >
+              {isDropping ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : dropAmount > totalDrawerCash && totalDrawerCash > 0 ? (
+                `Amount Exceeds Drawer (${peso(totalDrawerCash)})`
+              ) : totalDrawerCash <= 0 ? (
+                'Drawer Empty'
+              ) : (
+                `Confirm Safe Drop • ${peso(dropAmount)}`
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
