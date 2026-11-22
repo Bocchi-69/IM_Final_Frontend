@@ -1,6 +1,14 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3001/api';
+const rawApi =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  process.env.BACKEND_URL ||
+  'http://127.0.0.1:3001/api';
+
+export const API = rawApi.endsWith('/api')
+  ? rawApi.replace(/\/+$/, '')
+  : `${rawApi.replace(/\/+$/, '')}/api`;
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
