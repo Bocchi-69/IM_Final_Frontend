@@ -168,21 +168,33 @@ export default function SellPage() {
     [lines, cart]
   );
 
-  // Cash change calculation
+  // Cash calculations & validations
   const cashNum = parseFloat(cashTendered) || 0;
-  const changeDue = cashNum >= total ? cashNum - total : 0;
+  const hasEnteredCash = cashTendered.trim().length > 0;
+  const isInsufficient = hasEnteredCash && cashNum < total;
+  const changeDue = hasEnteredCash && cashNum >= total ? cashNum - total : 0;
+  const shortfall = isInsufficient ? total - cashNum : 0;
 
   // Save sale
   const save = async () => {
     if (lines.length === 0) return;
+    if (isInsufficient) {
+      toast.error(
+        `Cannot complete sale: Cash received (${peso(cashNum)}) is less than total due (${peso(total)}). Short by ${peso(shortfall)}.`
+      );
+      return;
+    }
     setBusy(true);
     try {
       await api('/sales', {
         method: 'POST',
-        body: { items: lines.map((p) => ({ product_id: p.id, quantity: cart[p.id] })) },
+        body: {
+          items: lines.map((p) => ({ product_id: p.id, quantity: cart[p.id] })),
+          cash_received: hasEnteredCash ? cashNum : total,
+        },
       });
 
-      const changeNotice = cashNum > total ? ` • Change: ${peso(changeDue)}` : '';
+      const changeNotice = hasEnteredCash && cashNum > total ? ` • Change: ${peso(changeDue)}` : '';
       toast.success(`Sale completed: ${peso(total)}${changeNotice}`);
 
       setCart({});
@@ -706,7 +718,11 @@ export default function SellPage() {
                         placeholder="Amount tendered"
                         value={cashTendered}
                         onChange={(e) => setCashTendered(e.target.value)}
-                        className="pl-6 h-8 text-xs font-bold"
+                        className={`pl-6 h-8 text-xs font-bold ${
+                          isInsufficient
+                            ? 'border-destructive focus-visible:ring-destructive text-destructive'
+                            : ''
+                        }`}
                       />
                     </div>
 
@@ -732,10 +748,20 @@ export default function SellPage() {
                     </div>
 
                     {/* Change readout */}
-                    {cashNum >= total && cashNum > 0 && (
+                    {hasEnteredCash && cashNum >= total && (
                       <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs">
                         <span className="font-semibold">Change to Customer:</span>
                         <strong className="text-sm font-extrabold">{peso(changeDue)}</strong>
+                      </div>
+                    )}
+
+                    {/* Insufficient Cash Warning */}
+                    {isInsufficient && (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs animate-in fade-in-50 duration-150">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          <AlertTriangle className="size-3.5" /> Insufficient Cash:
+                        </span>
+                        <strong className="text-sm font-extrabold">Short by {peso(shortfall)}</strong>
                       </div>
                     )}
                   </div>
@@ -743,16 +769,28 @@ export default function SellPage() {
                   {/* Primary Complete Sale Button */}
                   <Button
                     size="lg"
-                    className="w-full font-bold gap-2 text-sm h-11 cursor-pointer shadow-sm"
-                    disabled={busy || lines.length === 0}
+                    className={`w-full font-bold gap-2 text-sm h-11 cursor-pointer shadow-sm ${
+                      isInsufficient
+                        ? 'bg-destructive/80 hover:bg-destructive/80 text-destructive-foreground opacity-80 cursor-not-allowed'
+                        : ''
+                    }`}
+                    disabled={busy || lines.length === 0 || isInsufficient}
                     onClick={save}
                   >
                     {busy ? (
                       <Loader2 className="size-4 animate-spin" />
+                    ) : isInsufficient ? (
+                      <span className="flex items-center gap-1.5">
+                        <AlertTriangle className="size-4" /> Insufficient Cash • Short by {peso(shortfall)}
+                      </span>
                     ) : (
-                      <Check className="size-4" />
+                      <>
+                        <Check className="size-4" />
+                        {`Complete Sale • ${peso(total)}${
+                          hasEnteredCash && cashNum > total ? ` (Change: ${peso(changeDue)})` : ''
+                        }`}
+                      </>
                     )}
-                    {busy ? 'Saving Transaction...' : `Complete Sale • ${peso(total)}`}
                   </Button>
                 </div>
               )}
