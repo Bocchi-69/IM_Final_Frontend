@@ -56,7 +56,13 @@ export default function StaffWorkPage() {
   const [shiftDuration, setShiftDuration] = useState<string>('0m');
 
   // Pre-shift form state
-  const [floatAmount, setFloatAmount] = useState<number>(500);
+  const [floatAmount, setFloatAmount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stockify_shift_float');
+      if (saved) return Number(saved) || 500;
+    }
+    return 500;
+  });
   const [dutyType, setDutyType] = useState<string>('Morning Cashier Duty');
   const [startingShift, setStartingShift] = useState(false);
 
@@ -131,6 +137,9 @@ export default function StaffWorkPage() {
     try {
       const res = await api<{ shift: Shift }>('/shifts/start', { method: 'POST' });
       setShift(res.shift);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stockify_shift_float', String(floatAmount));
+      }
       toast.success(`Shift started successfully! Starting cash float: ${peso(floatAmount)}`);
       await loadShift();
     } catch (err) {
@@ -147,6 +156,9 @@ export default function StaffWorkPage() {
       await api('/shifts/end', { method: 'POST' });
       setShift(null);
       setShiftSales([]);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('stockify_shift_float');
+      }
       setShowEndDialog(false);
       toast.success('Work shift ended and cash drawer settled.');
       await loadShift();
@@ -158,6 +170,13 @@ export default function StaffWorkPage() {
   };
 
   const isShiftActive = Boolean(shift && !shift.ended_at);
+
+  // Dynamic Shift Metrics
+  const shiftSalesTotal = Number(shift?.total) || 0;
+  const shiftSalesCount = Number(shift?.sales_count) || shiftSales.length || 0;
+  const cashDropsTotal = Number((shift as any)?.cash_drops_total) || 0;
+  const drawerExpectedCash = Math.max(0, floatAmount + shiftSalesTotal - cashDropsTotal);
+  const avgPerSale = shiftSalesCount > 0 ? shiftSalesTotal / shiftSalesCount : 0;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto pb-12">
@@ -392,8 +411,10 @@ export default function StaffWorkPage() {
                     <DollarSign className="size-4 text-emerald-500" />
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
-                    <p className="text-2xl font-bold tabular-nums text-foreground">{peso(shift?.total ?? 164.0)}</p>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">+100% Cash sales</p>
+                    <p className="text-2xl font-bold tabular-nums text-foreground">{peso(shiftSalesTotal)}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                      {shiftSalesCount > 0 ? `${shiftSalesCount} cash receipts` : 'No sales recorded yet'}
+                    </p>
                   </CardContent>
                 </Card>
 
@@ -404,20 +425,24 @@ export default function StaffWorkPage() {
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
                     <p className="text-2xl font-bold tabular-nums text-foreground">
-                      {shift?.sales_count ?? shiftSales.length} orders
+                      {shiftSalesCount} orders
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Average ₱54.60 per sale</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {shiftSalesCount > 0 ? `Avg ${peso(avgPerSale)} per sale` : 'Ready for first order'}
+                    </p>
                   </CardContent>
                 </Card>
 
                 <Card className="border bg-background shadow-xs">
                   <CardHeader className="pb-1 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase">Units Ringed Up</span>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase">Safe Remittances</span>
                     <Package className="size-4 text-violet-500" />
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
-                    <p className="text-2xl font-bold tabular-nums text-foreground">9 items</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Inventory deducted</p>
+                    <p className="text-2xl font-bold tabular-nums text-foreground">{peso(cashDropsTotal)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {cashDropsTotal > 0 ? 'Cash drops deducted' : 'No safe drops yet'}
+                    </p>
                   </CardContent>
                 </Card>
 
@@ -428,9 +453,12 @@ export default function StaffWorkPage() {
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
                     <p className="text-2xl font-bold tabular-nums text-foreground">
-                      {peso((shift?.total ?? 164.0) + floatAmount)}
+                      {peso(drawerExpectedCash)}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Float (₱{floatAmount}) + Sales</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Float ({peso(floatAmount)}) + Sales ({peso(shiftSalesTotal)})
+                      {cashDropsTotal > 0 ? ` - Drops (${peso(cashDropsTotal)})` : ''}
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -513,31 +541,53 @@ export default function StaffWorkPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="divide-y divide-border/60">
-            {shiftSales.map((sale) => (
-              <div key={sale.id} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold font-mono">
-                    #{sale.id}
+          {shiftSales.length === 0 ? (
+            <div className="py-10 text-center text-muted-foreground text-xs space-y-2">
+              <Receipt className="size-8 mx-auto text-muted-foreground/40" />
+              <p className="font-semibold text-foreground text-sm">No Shift Transactions Yet</p>
+              <p className="text-muted-foreground max-w-sm mx-auto">
+                Completed transactions in the POS terminal will be logged here with itemized details and receipt numbers.
+              </p>
+              <Button asChild size="sm" variant="outline" className="mt-2 text-xs">
+                <Link href="/sell">Open POS Terminal</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {shiftSales.map((sale) => {
+                let timeStr = sale.time;
+                try {
+                  timeStr = new Date(sale.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } catch {
+                  // Fallback to original
+                }
+
+                return (
+                  <div key={sale.id} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold font-mono">
+                        #{sale.id}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{sale.items || 'General POS Sale'}</p>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-2">
+                          <span>{timeStr}</span>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-[10px] py-0 h-4">
+                            {sale.type || 'Cash'}
+                          </Badge>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-foreground tabular-nums">{peso(sale.total)}</p>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Completed</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{sale.items}</p>
-                    <p className="text-[11px] text-muted-foreground flex items-center gap-2">
-                      <span>{sale.time}</span>
-                      <span>•</span>
-                      <Badge variant="outline" className="text-[10px] py-0 h-4">
-                        {sale.type}
-                      </Badge>
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-foreground tabular-nums">{peso(sale.total)}</p>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Completed</p>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -551,20 +601,28 @@ export default function StaffWorkPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-3 border-y text-xs">
+          <div className="space-y-2 py-3 border-y text-xs">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Starting Float:</span>
+              <span className="text-muted-foreground">Starting Cash Float:</span>
               <span className="font-semibold">{peso(floatAmount)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total Cash Sales Recorded:</span>
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                {peso(shift?.total ?? 164.0)}
+                +{peso(shiftSalesTotal)}
               </span>
             </div>
+            {cashDropsTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Safe Remittances (Cash Drops):</span>
+                <span className="font-semibold text-destructive">
+                  -{peso(cashDropsTotal)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between pt-2 border-t font-bold text-sm">
               <span>Expected Cash to Remit:</span>
-              <span className="text-foreground">{peso((shift?.total ?? 164.0) + floatAmount)}</span>
+              <span className="text-primary text-base font-extrabold">{peso(drawerExpectedCash)}</span>
             </div>
           </div>
 

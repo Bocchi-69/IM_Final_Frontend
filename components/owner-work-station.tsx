@@ -258,7 +258,11 @@ export function OwnerWorkStation() {
 
   // Filter low stock items requiring immediate restock
   const lowStockItems = products.filter((p) => p.stock <= p.low_stock_threshold);
-  const totalDrawerCash = (currentShift?.total ?? 0) + (currentShift ? 500 : 0) - cashDrops.reduce((a, c) => a + c.amount, 0);
+  const totalSafeDrops = cashDrops.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const totalDrawerCash = Math.max(
+    0,
+    (Number(currentShift?.total) || 0) + (currentShift ? 500 : 0) - totalSafeDrops
+  );
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto pb-12 select-none">

@@ -129,6 +129,14 @@ export type Shift = {
   ended_at: string | null;
   total?: number | null;
   sales_count?: number;
+  cash_drops_total?: number;
+  recent_sales?: {
+    id: number;
+    time: string;
+    total: number;
+    type: string;
+    items: string;
+  }[];
   user?: { id: number; name: string };
   items?: { product_name: string; qty: number; amount: number }[];
 };
