@@ -155,17 +155,10 @@ export function OwnerWorkStation() {
     if (!selectedProduct || restockQty <= 0) return;
     setRestocking(true);
     try {
-      try {
-        await api(`/products/${selectedProduct.id}/restock`, {
-          method: 'POST',
-          body: { quantity: restockQty, note: restockNote },
-        });
-      } catch {
-        // Local demo update
-        setProducts((prev) =>
-          prev.map((p) => (p.id === selectedProduct.id ? { ...p, stock: p.stock + restockQty } : p))
-        );
-      }
+      await api(`/products/${selectedProduct.id}/restock`, {
+        method: 'POST',
+        body: { quantity: restockQty, note: restockNote },
+      });
       toast.success(`Restocked +${restockQty} units of ${selectedProduct.name}! New stock: ${selectedProduct.stock + restockQty}`);
       setSelectedProduct(null);
       setRestockQty(24);
@@ -277,9 +270,10 @@ export function OwnerWorkStation() {
   // Filter low stock items requiring immediate restock
   const lowStockItems = products.filter((p) => p.stock <= p.low_stock_threshold);
   const totalSafeDrops = cashDrops.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const shiftFloat = Number((currentShift as any)?.opening_float) || 500;
   const totalDrawerCash = Math.max(
     0,
-    (Number(currentShift?.total) || 0) + (currentShift ? 500 : 0) - totalSafeDrops
+    (Number(currentShift?.total) || 0) + (currentShift ? shiftFloat : 0) - totalSafeDrops
   );
 
   return (

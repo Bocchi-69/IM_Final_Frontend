@@ -135,7 +135,10 @@ export default function StaffWorkPage() {
   const handleStartShift = async () => {
     setStartingShift(true);
     try {
-      const res = await api<{ shift: Shift }>('/shifts/start', { method: 'POST' });
+      const res = await api<{ shift: Shift }>('/shifts/start', {
+        method: 'POST',
+        body: { opening_float: floatAmount },
+      });
       setShift(res.shift);
       if (typeof window !== 'undefined') {
         localStorage.setItem('stockify_shift_float', String(floatAmount));
@@ -172,10 +175,11 @@ export default function StaffWorkPage() {
   const isShiftActive = Boolean(shift && !shift.ended_at);
 
   // Dynamic Shift Metrics
+  const activeFloat = Number((shift as any)?.opening_float) || floatAmount;
   const shiftSalesTotal = Number(shift?.total) || 0;
   const shiftSalesCount = Number(shift?.sales_count) || shiftSales.length || 0;
   const cashDropsTotal = Number((shift as any)?.cash_drops_total) || 0;
-  const drawerExpectedCash = Math.max(0, floatAmount + shiftSalesTotal - cashDropsTotal);
+  const drawerExpectedCash = Math.max(0, activeFloat + shiftSalesTotal - cashDropsTotal);
   const avgPerSale = shiftSalesCount > 0 ? shiftSalesTotal / shiftSalesCount : 0;
 
   return (
@@ -604,7 +608,7 @@ export default function StaffWorkPage() {
           <div className="space-y-2 py-3 border-y text-xs">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Starting Cash Float:</span>
-              <span className="font-semibold">{peso(floatAmount)}</span>
+              <span className="font-semibold">{peso(activeFloat)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total Cash Sales Recorded:</span>

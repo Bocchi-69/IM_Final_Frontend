@@ -89,23 +89,28 @@ export default function LoginPage() {
     toast.info("To reset your password, contact store support or re-register your store.");
   };
 
-  const handleDemoTerminal = async () => {
-    setBusy(true);
-    try {
-      const r = await api<{ user: User; token: string }>("/auth/login", {
-        method: "POST",
-        body: { email: "owner@stockify.ph", password: "password" },
-      });
-      signIn(r.token, r.user);
-      toast.success("Connected to live demo store: Stockify Supermart!");
-      router.replace("/dashboard");
-    } catch {
-      setStoreAccount(DEMO_STORE);
-      setStoreLocked(true);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const isProduction = process.env.NODE_ENV === "production";
+  const showDemo = process.env.NEXT_PUBLIC_ENABLE_DEMO === "true" || !isProduction;
+
+  const handleDemoTerminal = !showDemo
+    ? undefined
+    : async () => {
+        setBusy(true);
+        try {
+          const r = await api<{ user: User; token: string }>("/auth/login", {
+            method: "POST",
+            body: { email: "owner@stockify.ph", password: "password" },
+          });
+          signIn(r.token, r.user);
+          toast.success("Connected to live demo store: Stockify Supermart!");
+          router.replace("/dashboard");
+        } catch {
+          setStoreAccount(DEMO_STORE);
+          setStoreLocked(true);
+        } finally {
+          setBusy(false);
+        }
+      };
 
   // If the store is locked on this terminal, display the Role & PIN Screen
   if (storeLocked && (store || DEMO_STORE)) {

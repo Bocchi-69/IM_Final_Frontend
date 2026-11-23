@@ -145,38 +145,50 @@ export function ChatWidget() {
     ]);
   };
 
+  const renderInline = (text: string) => {
+    // Split by **bold** text patterns safely without dangerouslySetInnerHTML
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+        return <strong key={index}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
   const renderFormatted = (content: string) => {
     // Process markdown line by line
     const lines = content.split('\n');
     return lines.map((line, idx) => {
-      // Bold handling
-      const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      const trimmed = line.trim();
 
       // Bullets
-      if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
-        const bulletText = line.trim().slice(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const bulletText = trimmed.slice(2);
         return (
           <li
             key={idx}
             className="ml-4 list-disc text-xs sm:text-sm leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: bulletText }}
-          />
+          >
+            {renderInline(bulletText)}
+          </li>
         );
       }
 
       // Headers
-      if (line.trim().startsWith('### ')) {
+      if (trimmed.startsWith('### ')) {
         return (
           <h4
             key={idx}
             className="font-bold text-xs sm:text-sm mt-2 mb-1"
-            dangerouslySetInnerHTML={{ __html: line.slice(4).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
-          />
+          >
+            {renderInline(trimmed.slice(4))}
+          </h4>
         );
       }
 
       // Empty line spacer
-      if (!line.trim()) {
+      if (!trimmed) {
         return <div key={idx} className="h-1.5" />;
       }
 
@@ -184,8 +196,9 @@ export function ChatWidget() {
         <p
           key={idx}
           className="text-xs sm:text-sm leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: formattedLine }}
-        />
+        >
+          {renderInline(line)}
+        </p>
       );
     });
   };
