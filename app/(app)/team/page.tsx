@@ -42,8 +42,26 @@ export default function TeamPage() {
 
   const add = (e: FormEvent) => {
     e.preventDefault();
+    const trimmedName = name.trim();
+    const trimmedPin = pin.trim();
+
+    if (!trimmedName) {
+      toast.error('Please enter an employee name.');
+      return;
+    }
+
+    if (team.some((m) => m.name.trim().toLowerCase() === trimmedName.toLowerCase())) {
+      toast.error('A staff member with this name already exists in your store.');
+      return;
+    }
+
+    if (!/^\d{4}$/.test(trimmedPin)) {
+      toast.error('PIN must be exactly 4 digits.');
+      return;
+    }
+
     run(async () => {
-      await api('/staff', { method: 'POST', body: { name, pin } });
+      await api('/staff', { method: 'POST', body: { name: trimmedName, pin: trimmedPin } });
       setName('');
       setPin('');
     }, 'Employee added.');
@@ -51,13 +69,14 @@ export default function TeamPage() {
 
   const reset = (m: Member) => {
     const p = prompt(`New 4-digit PIN for ${m.name}:`);
-    if (p) {
-      if (!/^\d{4}$/.test(p)) {
+    if (p !== null) {
+      const trimmedPin = p.trim();
+      if (!/^\d{4}$/.test(trimmedPin)) {
         toast.error('PIN must be exactly 4 digits.');
         return;
       }
       run(
-        () => api(`/staff/${m.id}/pin`, { method: 'PATCH', body: { pin: p } }),
+        () => api(`/staff/${m.id}/pin`, { method: 'PATCH', body: { pin: trimmedPin } }),
         `PIN reset for ${m.name}.`
       );
     }
