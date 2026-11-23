@@ -236,11 +236,22 @@ export function App1() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         {getProductImage(item) ? (
-                          <img
-                            src={getProductImage(item)!}
-                            alt={item.name}
-                            className="size-5 rounded object-cover border shrink-0 bg-muted/20"
-                          />
+                          <>
+                            <img
+                              src={getProductImage(item)!}
+                              alt={item.name}
+                              referrerPolicy="no-referrer"
+                              className="size-5 rounded object-cover border shrink-0 bg-muted/20"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'inline-block';
+                              }}
+                            />
+                            <span style={{ display: 'none' }} className="text-lg">
+                              {item.emoji ?? '🛍️'}
+                            </span>
+                          </>
                         ) : (
                           <span className="text-lg">{item.emoji ?? '🛍️'}</span>
                         )}

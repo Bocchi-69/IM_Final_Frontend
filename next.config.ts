@@ -17,10 +17,6 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_API_URL: resolvedApiUrl || process.env.NEXT_PUBLIC_API_URL || "",
   },
   /* config options here */
-  experimental: {
-    agentFeedback: true,
-    agentUpgrade: "security",
-  },
   cacheComponents: true,
   partialPrefetching: false,
   turbopack: {

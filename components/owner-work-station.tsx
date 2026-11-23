@@ -269,11 +269,11 @@ export function OwnerWorkStation() {
 
   // Filter low stock items requiring immediate restock
   const lowStockItems = products.filter((p) => p.stock <= p.low_stock_threshold);
-  const totalSafeDrops = cashDrops.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const totalSafeDrops = Math.round(cashDrops.reduce((a, c) => a + (Number(c.amount) || 0), 0) * 100) / 100;
   const shiftFloat = Number((currentShift as any)?.opening_float) || 500;
   const totalDrawerCash = Math.max(
     0,
-    (Number(currentShift?.total) || 0) + (currentShift ? shiftFloat : 0) - totalSafeDrops
+    Math.round(((Number(currentShift?.total) || 0) + (currentShift ? shiftFloat : 0) - totalSafeDrops) * 100) / 100
   );
 
   return (
@@ -421,7 +421,7 @@ export function OwnerWorkStation() {
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 <p className="text-2xl font-bold tabular-nums text-foreground">
-                  {peso(cashDrops.reduce((a, c) => a + c.amount, 0))}
+                  {peso(totalSafeDrops)}
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">
                   {cashDrops.length} safe drops secured
@@ -474,11 +474,22 @@ export function OwnerWorkStation() {
                       <div key={p.id} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
                         <div className="flex items-center gap-3 min-w-0">
                           {getProductImage(p) ? (
-                            <img
-                              src={getProductImage(p)!}
-                              alt={p.name}
-                              className="size-8 rounded-md object-cover border shrink-0 bg-muted/20"
-                            />
+                            <>
+                              <img
+                                src={getProductImage(p)!}
+                                alt={p.name}
+                                referrerPolicy="no-referrer"
+                                className="size-8 rounded-md object-cover border shrink-0 bg-muted/20"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'inline-block';
+                                }}
+                              />
+                              <span style={{ display: 'none' }} className="text-2xl shrink-0">
+                                {p.emoji ?? '📦'}
+                              </span>
+                            </>
                           ) : (
                             <span className="text-2xl shrink-0">{p.emoji ?? '📦'}</span>
                           )}

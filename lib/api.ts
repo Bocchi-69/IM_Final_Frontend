@@ -25,14 +25,19 @@ export const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 60000, // 60 seconds (allows for Render cold starts)
+  withCredentials: true,
 });
 
-// Request interceptor: attach bearer token
+// Request interceptor: attach bearer token and CSRF token header
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('tindahan_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const match = document.cookie.match(/(?:^|;\s*)csrfToken=([^;]+)/);
+    if (match && match[1]) {
+      config.headers['x-csrf-token'] = decodeURIComponent(match[1]);
     }
   }
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
@@ -85,7 +90,7 @@ export async function api<T = any>(
 }
 
 export const peso = (n: number) =>
-  '₱' + Number(n).toLocaleString('en-PH', { maximumFractionDigits: 2 });
+  '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const errorText = (e: unknown) => {
   if (e instanceof ApiError) return e.message;
@@ -113,13 +118,28 @@ export type Product = {
 
 export function getProductImage(p: Partial<Product> | null | undefined): string | null {
   if (!p) return null;
-  if (p.image_url) return p.image_url;
-  if (!p.image_path) return null;
-  if (p.image_path.startsWith('http://') || p.image_path.startsWith('https://') || p.image_path.startsWith('data:')) {
-    return p.image_path;
+
+  const raw = p.image_path || p.image_url;
+  if (!raw) return null;
+
+  if (raw.startsWith('data:')) {
+    return raw;
   }
-  const clean = p.image_path.replace(/^\/?(storage\/)?/, '');
+
+  // Derive backend base URL from current API client config
   const baseUrl = API.replace(/\/api\/?$/, '');
+
+  // If it points to an uploaded image under /storage/
+  if (raw.includes('/storage/')) {
+    const sub = raw.substring(raw.indexOf('/storage/'));
+    return `${baseUrl}${sub}`;
+  }
+
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw;
+  }
+
+  const clean = raw.replace(/^\/?(storage\/)?/, '');
   return `${baseUrl}/storage/${clean}`;
 }
 

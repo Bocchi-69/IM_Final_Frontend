@@ -638,13 +638,26 @@ export default function StockPage() {
                   {/* Image container */}
                   <div className="relative w-full aspect-4/3 bg-muted/20 border-b overflow-hidden flex items-center justify-center">
                     {imgUrl ? (
-                      <img
-                        src={imgUrl}
-                        alt={p.name}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
+                      <>
+                        <img
+                          src={imgUrl}
+                          alt={p.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'grid';
+                          }}
+                        />
+                        <div
+                          style={{ display: 'none' }}
+                          className="grid size-full place-items-center text-4xl select-none bg-muted/10"
+                        >
+                          {p.emoji ?? '🛍️'}
+                        </div>
+                      </>
                     ) : (
                       <div className="grid size-full place-items-center text-4xl select-none bg-muted/10">
                         {p.emoji ?? '🛍️'}
@@ -780,12 +793,25 @@ export default function StockPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           {imgUrl ? (
-                            <img
-                              src={imgUrl}
-                              alt={p.name}
-                              referrerPolicy="no-referrer"
-                              className="size-10 rounded-lg object-cover border bg-muted/20 shrink-0"
-                            />
+                            <>
+                              <img
+                                src={imgUrl}
+                                alt={p.name}
+                                referrerPolicy="no-referrer"
+                                className="size-10 rounded-lg object-cover border bg-muted/20 shrink-0"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'grid';
+                                }}
+                              />
+                              <div
+                                style={{ display: 'none' }}
+                                className="size-10 grid place-items-center rounded-lg border bg-muted/20 text-xl shrink-0 select-none"
+                              >
+                                {p.emoji ?? '🛍️'}
+                              </div>
+                            </>
                           ) : (
                             <div className="size-10 grid place-items-center rounded-lg border bg-muted/20 text-xl shrink-0 select-none">
                               {p.emoji ?? '🛍️'}
@@ -1289,11 +1315,25 @@ export default function StockPage() {
             <form onSubmit={handleRestockSubmit} className="space-y-4 pt-2">
               <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border">
                 {getProductImage(restockProduct) ? (
-                  <img
-                    src={getProductImage(restockProduct)!}
-                    alt={restockProduct.name}
-                    className="size-12 rounded-lg object-cover border bg-muted shrink-0"
-                  />
+                  <>
+                    <img
+                      src={getProductImage(restockProduct)!}
+                      alt={restockProduct.name}
+                      referrerPolicy="no-referrer"
+                      className="size-12 rounded-lg object-cover border bg-muted shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'grid';
+                      }}
+                    />
+                    <div
+                      style={{ display: 'none' }}
+                      className="size-12 rounded-lg border bg-muted/20 grid place-items-center text-2xl select-none shrink-0"
+                    >
+                      {restockProduct.emoji ?? '🛍️'}
+                    </div>
+                  </>
                 ) : (
                   <div className="size-12 rounded-lg border bg-muted/20 grid place-items-center text-2xl select-none shrink-0">
                     {restockProduct.emoji ?? '🛍️'}

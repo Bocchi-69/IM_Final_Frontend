@@ -231,7 +231,20 @@ function Descriptive({ d }: { d: Analytics['descriptive'] }) {
                 <div className="flex justify-between text-sm">
                   <span className="flex items-center gap-1.5">
                     {getProductImage(p) ? (
-                      <img src={getProductImage(p)!} alt={p.name} className="size-4 rounded object-cover" />
+                      <>
+                        <img
+                          src={getProductImage(p)!}
+                          alt={p.name}
+                          referrerPolicy="no-referrer"
+                          className="size-4 rounded object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'inline';
+                          }}
+                        />
+                        <span style={{ display: 'none' }}>{p.emoji}</span>
+                      </>
                     ) : (
                       <span>{p.emoji}</span>
                     )}
@@ -256,7 +269,20 @@ function Descriptive({ d }: { d: Analytics['descriptive'] }) {
               <div key={p.id} className="flex justify-between py-1 border-b last:border-0">
                 <span className="flex items-center gap-1.5">
                   {getProductImage(p) ? (
-                    <img src={getProductImage(p)!} alt={p.name} className="size-4 rounded object-cover" />
+                    <>
+                      <img
+                        src={getProductImage(p)!}
+                        alt={p.name}
+                        referrerPolicy="no-referrer"
+                        className="size-4 rounded object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'inline';
+                        }}
+                      />
+                      <span style={{ display: 'none' }}>{p.emoji}</span>
+                    </>
                   ) : (
                     <span>{p.emoji}</span>
                   )}
@@ -426,7 +452,22 @@ function Predictive({ p }: { p: Analytics['predictive'] }) {
               <div key={r.id} className="flex items-center justify-between gap-3 text-sm py-1 border-b last:border-0">
                 <div className="flex items-center gap-2.5">
                   {getProductImage(r) ? (
-                    <img src={getProductImage(r)!} alt={r.name} className="size-8 rounded-md object-cover border bg-muted/20" />
+                    <>
+                      <img
+                        src={getProductImage(r)!}
+                        alt={r.name}
+                        referrerPolicy="no-referrer"
+                        className="size-8 rounded-md object-cover border bg-muted/20"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'inline';
+                        }}
+                      />
+                      <span style={{ display: 'none' }} className="text-xl">
+                        {r.emoji}
+                      </span>
+                    </>
                   ) : (
                     <span className="text-xl">{r.emoji}</span>
                   )}

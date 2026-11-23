@@ -159,21 +159,21 @@ export default function SellPage() {
 
   // Cart totals
   const lines = useMemo(() => products.filter((p) => cart[p.id]), [products, cart]);
-  const total = useMemo(
-    () => lines.reduce((t, p) => t + p.price * cart[p.id], 0),
-    [lines, cart]
-  );
+  const total = useMemo(() => {
+    const cents = lines.reduce((t, p) => t + Math.round(Number(p.price) * 100) * cart[p.id], 0);
+    return Math.round(cents) / 100;
+  }, [lines, cart]);
   const totalItemCount = useMemo(
     () => lines.reduce((t, p) => t + cart[p.id], 0),
     [lines, cart]
   );
 
   // Cash calculations & validations
-  const cashNum = parseFloat(cashTendered) || 0;
+  const cashNum = Math.round((parseFloat(cashTendered) || 0) * 100) / 100;
   const hasEnteredCash = cashTendered.trim().length > 0;
   const isInsufficient = hasEnteredCash && cashNum < total;
-  const changeDue = hasEnteredCash && cashNum >= total ? cashNum - total : 0;
-  const shortfall = isInsufficient ? total - cashNum : 0;
+  const changeDue = hasEnteredCash && cashNum >= total ? Math.round((cashNum - total) * 100) / 100 : 0;
+  const shortfall = isInsufficient ? Math.round((total - cashNum) * 100) / 100 : 0;
 
   // Save sale
   const save = async () => {
@@ -505,18 +505,22 @@ export default function SellPage() {
 
                     {/* Image Container */}
                     <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted/30 border border-border/40 mb-2 flex items-center justify-center">
-                      {imgUrl ? (
+                      {imgUrl && (
                         <img
                           src={imgUrl}
                           alt={p.name}
                           className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                           loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fb = e.currentTarget.parentElement?.querySelector('.img-fallback') as HTMLElement;
+                            if (fb) fb.style.display = 'grid';
+                          }}
                         />
-                      ) : (
-                        <div className="grid size-full place-items-center text-3xl select-none">
-                          {p.emoji ?? '🛍️'}
-                        </div>
                       )}
+                      <div className={`img-fallback grid size-full place-items-center text-3xl select-none ${imgUrl ? 'hidden' : ''}`}>
+                        {p.emoji ?? '🛍️'}
+                      </div>
 
                       {isOutOfStock && (
                         <div className="absolute inset-0 bg-background/85 backdrop-blur-[2px] flex items-center justify-center">
@@ -609,17 +613,21 @@ export default function SellPage() {
 
                     return (
                       <div key={p.id} className="pt-2 first:pt-0 flex items-center justify-between gap-2.5">
-                        {itemImg ? (
+                        {itemImg && (
                           <img
                             src={itemImg}
                             alt={p.name}
                             className="size-10 rounded-lg object-cover border bg-muted/20 shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fb = e.currentTarget.parentElement?.querySelector('.cart-fallback') as HTMLElement;
+                              if (fb) fb.style.display = 'grid';
+                            }}
                           />
-                        ) : (
-                          <div className="size-10 grid place-items-center rounded-lg border bg-muted/20 text-base shrink-0 select-none">
-                            {p.emoji ?? '🛍️'}
-                          </div>
                         )}
+                        <div className={`cart-fallback size-10 grid place-items-center rounded-lg border bg-muted/20 text-base shrink-0 select-none ${itemImg ? 'hidden' : ''}`}>
+                          {p.emoji ?? '🛍️'}
+                        </div>
 
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-foreground truncate leading-tight">
