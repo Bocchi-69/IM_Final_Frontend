@@ -28,16 +28,12 @@ export const apiClient: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor: attach bearer token and CSRF token header
+// Request interceptor: attach bearer token
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('tindahan_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    const match = document.cookie.match(/(?:^|;\s*)csrfToken=([^;]+)/);
-    if (match && match[1]) {
-      config.headers['x-csrf-token'] = decodeURIComponent(match[1]);
     }
   }
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
