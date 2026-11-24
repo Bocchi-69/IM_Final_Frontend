@@ -79,6 +79,8 @@ export default function StockPage() {
   const [restockProduct, setRestockProduct] = useState<Product | null>(null);
   const [restockQty, setRestockQty] = useState('');
   const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [restockPriceChange, setRestockPriceChange] = useState<'yes' | 'no' | null>(null);
+  const [restockNewPrice, setRestockNewPrice] = useState('');
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [barcodeProduct, setBarcodeProduct] = useState<Product | null>(null);
@@ -300,15 +302,39 @@ export default function StockPage() {
       return;
     }
 
+    // Validate new price if owner chose to change it
+    let newPriceNum: number | undefined = undefined;
+    if (restockPriceChange === 'yes') {
+      newPriceNum = parseFloat(restockNewPrice);
+      if (!restockNewPrice || isNaN(newPriceNum) || newPriceNum < 0.01) {
+        toast.error('Please enter a valid new price (₱0.01 or higher).');
+        return;
+      }
+    }
+
     setRestockSubmitting(true);
     try {
       await api(`/products/${restockProduct.id}/restock`, {
         method: 'POST',
-        body: { quantity: qtyToAdd },
+        body: {
+          quantity: qtyToAdd,
+          ...(newPriceNum !== undefined ? { new_price: newPriceNum } : {}),
+        },
       });
-      toast.success(`Added ${qtyToAdd} to ${restockProduct.name}.`);
+
+      const wasOutOfStock = restockProduct.stock === 0;
+      if (newPriceNum !== undefined && wasOutOfStock) {
+        toast.success(`Added ${qtyToAdd} units to ${restockProduct.name} and updated price to ${peso(newPriceNum)}.`);
+      } else if (newPriceNum !== undefined && !wasOutOfStock) {
+        toast.info(`Added ${qtyToAdd} units to ${restockProduct.name}. Price will update to ${peso(newPriceNum)} once current stock sells out.`);
+      } else {
+        toast.success(`Added ${qtyToAdd} to ${restockProduct.name}.`);
+      }
+
       setRestockProduct(null);
       setRestockQty('');
+      setRestockPriceChange(null);
+      setRestockNewPrice('');
       await load();
     } catch (e) {
       toast.error(errorText(e));
@@ -737,6 +763,8 @@ export default function StockPage() {
                       onClick={() => {
                         setRestockProduct(p);
                         setRestockQty('');
+                        setRestockPriceChange(null);
+                        setRestockNewPrice('');
                       }}
                     >
                       <RefreshCw className="size-3.5" />
@@ -872,6 +900,8 @@ export default function StockPage() {
                               onClick={() => {
                                 setRestockProduct(p);
                                 setRestockQty('');
+                                setRestockPriceChange(null);
+                                setRestockNewPrice('');
                               }}
                             >
                               <RefreshCw className="size-3" />
@@ -1299,7 +1329,13 @@ export default function StockPage() {
       {/* ========================================================================= */}
       {/* QUICK RESTOCK MODAL */}
       {/* ========================================================================= */}
-      <Dialog open={!!restockProduct} onOpenChange={(open) => !open && setRestockProduct(null)}>
+      <Dialog open={!!restockProduct} onOpenChange={(open) => {
+        if (!open) {
+          setRestockProduct(null);
+          setRestockPriceChange(null);
+          setRestockNewPrice('');
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
@@ -1343,7 +1379,11 @@ export default function StockPage() {
                   <h4 className="font-bold text-sm truncate">{restockProduct.name}</h4>
                   <p className="text-xs text-muted-foreground">
                     Current stock: <strong className="text-foreground">{restockProduct.stock} units</strong>
+                    {' · '}Current price: <strong className="text-foreground">{peso(restockProduct.price)}</strong>
                   </p>
+                  {restockProduct.stock === 0 && (
+                    <p className="text-[11px] text-destructive font-semibold mt-0.5">⚠ Product is currently out of stock</p>
+                  )}
                 </div>
               </div>
 
@@ -1379,6 +1419,73 @@ export default function StockPage() {
                 </div>
               </div>
 
+              {/* Price Change Question */}
+              <div className="space-y-2.5 rounded-xl border bg-muted/20 p-3.5">
+                <p className="text-xs font-semibold text-foreground">
+                  Is there any change in price for this restock?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRestockPriceChange('yes')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors cursor-pointer ${
+                      restockPriceChange === 'yes'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                        : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+                    }`}
+                  >
+                    ✓ Yes, update price
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRestockPriceChange('no'); setRestockNewPrice(''); }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors cursor-pointer ${
+                      restockPriceChange === 'no'
+                        ? 'bg-muted text-foreground border-foreground/30 shadow-xs'
+                        : 'bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'
+                    }`}
+                  >
+                    ✕ No, keep current price
+                  </button>
+                </div>
+
+                {/* New Price Input — shown only when "Yes" is selected */}
+                {restockPriceChange === 'yes' && (
+                  <div className="space-y-1.5 pt-1">
+                    <Label htmlFor="newPrice" className="text-xs font-semibold">
+                      New Selling Price (₱)
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">₱</span>
+                      <Input
+                        id="newPrice"
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        required
+                        placeholder={String(restockProduct.price)}
+                        value={restockNewPrice}
+                        onChange={(e) => setRestockNewPrice(e.target.value)}
+                        className="pl-6"
+                      />
+                    </div>
+
+                    {/* Contextual hint based on current stock level */}
+                    {restockProduct.stock === 0 ? (
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1">
+                        <Check className="size-3.5 shrink-0" />
+                        Old stock is sold out — the new price will be applied immediately when you confirm.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 mt-1">
+                        <AlertTriangle className="size-3.5 shrink-0" />
+                        There is still remaining stock ({restockProduct.stock} units). The price will update once the current stock sells out.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {Number(restockQty) > 0 && (
                 <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
                   <span>New stock level will be:</span>
@@ -1392,12 +1499,24 @@ export default function StockPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setRestockProduct(null)}
+                  onClick={() => {
+                    setRestockProduct(null);
+                    setRestockPriceChange(null);
+                    setRestockNewPrice('');
+                  }}
                   disabled={restockSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={restockSubmitting || !Number(restockQty)}>
+                <Button
+                  type="submit"
+                  disabled={
+                    restockSubmitting ||
+                    !Number(restockQty) ||
+                    restockPriceChange === null ||
+                    (restockPriceChange === 'yes' && !restockNewPrice)
+                  }
+                >
                   {restockSubmitting && <Loader2 className="size-4 animate-spin mr-1.5" />}
                   Confirm Restock
                 </Button>
