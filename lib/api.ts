@@ -99,6 +99,16 @@ export const errorText = (e: unknown) => {
   return 'Cannot reach the server.';
 };
 
+export type ProductBatch = {
+  id: number;
+  product_id: number;
+  quantity: number;
+  initial_quantity: number;
+  price: number;
+  status: string;
+  created_at: string;
+};
+
 export type Product = {
   id: number;
   name: string;
@@ -110,6 +120,7 @@ export type Product = {
   price: number;
   stock: number;
   low_stock_threshold: number;
+  batches?: ProductBatch[];
 };
 
 export function getProductImage(p: Partial<Product> | null | undefined): string | null {

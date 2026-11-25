@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Filter,
   ImagePlus,
+  Layers,
   LayoutGrid,
   List,
   Loader2,
@@ -324,11 +325,11 @@ export default function StockPage() {
 
       const wasOutOfStock = restockProduct.stock === 0;
       if (newPriceNum !== undefined && wasOutOfStock) {
-        toast.success(`Added ${qtyToAdd} units to ${restockProduct.name} and updated price to ${peso(newPriceNum)}.`);
+        toast.success(`Restocked ${qtyToAdd} units of ${restockProduct.name}. Active price set to ${peso(newPriceNum)}.`);
       } else if (newPriceNum !== undefined && !wasOutOfStock) {
-        toast.info(`Added ${qtyToAdd} units to ${restockProduct.name}. Price will update to ${peso(newPriceNum)} once current stock sells out.`);
+        toast.success(`Restocked ${qtyToAdd} units of ${restockProduct.name} queued at ${peso(newPriceNum)}. This price will activate automatically once earlier stock sells out.`);
       } else {
-        toast.success(`Added ${qtyToAdd} to ${restockProduct.name}.`);
+        toast.success(`Added ${qtyToAdd} units to ${restockProduct.name}.`);
       }
 
       setRestockProduct(null);
@@ -750,6 +751,37 @@ export default function StockPage() {
                         Alert threshold: {p.low_stock_threshold} units
                       </p>
                     </div>
+
+                    {/* FIFO Batches Queue Indicator */}
+                    {p.batches && p.batches.length > 1 && (
+                      <div className="bg-primary/5 p-2 rounded-lg border border-primary/20 space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-primary">
+                          <span className="flex items-center gap-1">
+                            <Layers className="size-3" />
+                            FIFO Batch Queue
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {p.batches.length} batches
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {p.batches.map((b, idx) => (
+                            <span
+                              key={b.id}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                idx === 0
+                                  ? 'bg-primary text-primary-foreground font-bold'
+                                  : 'bg-muted text-muted-foreground border border-border/80'
+                              }`}
+                              title={idx === 0 ? 'Currently Active Batch' : `Queued Batch #${idx + 1}`}
+                            >
+                              {idx === 0 ? 'Active: ' : 'Next: '}
+                              {b.quantity} × {peso(b.price)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -854,7 +886,14 @@ export default function StockPage() {
                         <div>{p.sku}</div>
                         {p.barcode && <div className="text-[11px] text-muted-foreground/80">{p.barcode}</div>}
                       </td>
-                      <td className="py-3 px-4 font-bold text-foreground">{peso(p.price)}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-foreground">{peso(p.price)}</div>
+                        {p.batches && p.batches.length > 1 && (
+                          <div className="text-[10px] text-primary/80 font-medium mt-0.5" title="Queued batches waiting to activate">
+                            +{p.batches.slice(1).map((b) => `${b.quantity}@${peso(b.price)}`).join(', ')} queued
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span
@@ -1379,11 +1418,16 @@ export default function StockPage() {
                   <h4 className="font-bold text-sm truncate">{restockProduct.name}</h4>
                   <p className="text-xs text-muted-foreground">
                     Current stock: <strong className="text-foreground">{restockProduct.stock} units</strong>
-                    {' · '}Current price: <strong className="text-foreground">{peso(restockProduct.price)}</strong>
+                    {' · '}Active price: <strong className="text-foreground">{peso(restockProduct.price)}</strong>
                   </p>
-                  {restockProduct.stock === 0 && (
+                  {restockProduct.stock === 0 ? (
                     <p className="text-[11px] text-destructive font-semibold mt-0.5">⚠ Product is currently out of stock</p>
-                  )}
+                  ) : restockProduct.batches && restockProduct.batches.length > 1 ? (
+                    <div className="mt-1 text-[11px] bg-primary/10 text-primary p-1.5 rounded border border-primary/20">
+                      <strong>FIFO Queue:</strong>{' '}
+                      {restockProduct.batches.map((b, i) => `${i === 0 ? 'Active' : 'Next'}: ${b.quantity} @ ${peso(b.price)}`).join(' ➔ ')}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -1474,12 +1518,12 @@ export default function StockPage() {
                     {restockProduct.stock === 0 ? (
                       <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1">
                         <Check className="size-3.5 shrink-0" />
-                        Old stock is sold out — the new price will be applied immediately when you confirm.
+                        Old stock is sold out — this new price will take effect immediately.
                       </p>
                     ) : (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 mt-1">
-                        <AlertTriangle className="size-3.5 shrink-0" />
-                        There is still remaining stock ({restockProduct.stock} units). The price will update once the current stock sells out.
+                      <p className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
+                        <Check className="size-3.5 shrink-0" />
+                        FIFO Batch Queuing: This new batch of {restockQty || 'units'} will be queued at {restockNewPrice ? peso(Number(restockNewPrice)) : 'this price'}. It will automatically activate once the earlier {restockProduct.stock} units are sold out.
                       </p>
                     )}
                   </div>
