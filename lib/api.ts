@@ -154,9 +154,12 @@ export type Shift = {
   id: number;
   started_at: string;
   ended_at: string | null;
+  opening_float?: number | null;
   total?: number | null;
   sales_count?: number;
   cash_drops_total?: number;
+  drawer_cash?: number;
+  overall_cash?: number;
   recent_sales?: {
     id: number;
     time: string;
